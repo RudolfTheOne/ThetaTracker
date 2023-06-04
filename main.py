@@ -1,12 +1,16 @@
+from datetime import datetime, timedelta
 import urwid
 from config_setup import load_user_config, load_system_config, save_user_config
-from config_setup import validate_max_delta, validate_dte_range_min, validate_dte_range_max, validate_buying_power
+from config_setup import validate_max_delta, validate_dte_range_min, validate_dte_range_max, \
+    validate_buying_power
 from data_fetch import is_market_open, fetch_option_chain
-from datetime import datetime, timedelta
 
 def format_option(option):
     if "message" in option:
-        return [urwid.Text(option["message"])]
+        row1 = urwid.Text([('default', f"\n")])
+        row2 = urwid.Text([('default', option["message"])])
+        row3 = urwid.Text([('default', f"\n")])
+        return urwid.Pile([row1, row2, row3])
 
     row1 = urwid.Text([
         ('default', f"\nTicker: "),
@@ -25,11 +29,12 @@ def format_option(option):
         ('default', f"   Description: "),
         ('bright white,bold', f"{option['description']}, "),
         ('default', f"Delta: "),
-        ('bright cyan', f"{option['delta']}, "),
+        ('bright white', f"{option['delta']}, "),
         ('default', f"Underlying price: $"),
         ('bright purple', f"{round(option['underlyingPrice'], 2)} "),
         ('bright white',
-         f"(d: ${round(option['underlyingPrice'] - option['strikePrice'], 2)} {round((option['underlyingPrice'] - option['strikePrice']) / option['underlyingPrice'], 2)}%), "),
+         f"(d: ${round(option['underlyingPrice'] - option['strikePrice'], 2)} "
+         f"{round((option['underlyingPrice'] - option['strikePrice']) / option['underlyingPrice'], 2)}%), "),
         ('default', f"Days to Expiration: "),
         ('bright white', f"{option['daysToExpiration']}")
     ])
@@ -39,7 +44,7 @@ def format_option(option):
         ('bright green,bold', f"${option['premium_usd']}, "),
         ('default', f"Premium per Day: ${option['premium_per_day']}, "),
         ('default', f"ARR: "),
-        ('bright white,bold', f"{option['arr']}, "),
+        ('bright cyan', f"{option['arr']}, "),
         ('default', f"No of Contracts to Write: "),
         ('bright white,bold', f"{option['no_of_contracts_to_write']}")
     ])
@@ -51,7 +56,8 @@ class SortingOptions(urwid.WidgetWrap):
         self.select_callback = select_callback
 
         # Create a button for each option and wrap it in a Filler widget
-        buttons = [urwid.Filler(urwid.Button(option, on_press=self.select_option)) for option in options]
+        buttons = [urwid.Filler(urwid.Button(option, on_press=self.select_option))
+                   for option in options]
 
         # Create a pile with the buttons
         pile = urwid.Pile(buttons)
@@ -70,7 +76,7 @@ class MainFrame(urwid.Frame):
         self.user_config = user_config
         self.system_config = system_config
         self.loop = loop
-        self.selected_sorting_option = None
+        self.current_sorting_method = user_config["default_sorting_method"] if user_config else "arr"
 
         # Create header_text and main_area here
         self.header_text = urwid.Text([
@@ -82,7 +88,8 @@ class MainFrame(urwid.Frame):
             ("header", ", "),
             ("header", "Market: "), ("header-bold", "Open" if is_market_open(system_config["api_key"]) else "Closed")
         ])
-        super().__init__(self.main_area, header=self.header_text, footer=footer)
+        header = urwid.AttrMap(self.header_text, "header")
+        super().__init__(self.main_area, header=header, footer=footer)
         # Dictionary to store the validation functions
         self.validation_functions = {
             "max_delta": validate_max_delta,
@@ -94,8 +101,14 @@ class MainFrame(urwid.Frame):
     def select_sorting_option(self, option):
         # This function is called when a sorting option is selected
         # Save the selected option to the user configuration
+        self.current_sorting_method = option
         self.user_config["default_sorting_method"] = option
-
+        footer_text = urwid.Text([
+            "q: exit app, c: configuration setup, s: sort by (now: {} desc.), r: forced refresh".format(
+                self.current_sorting_method)
+        ])
+        footer_text = urwid.AttrMap(footer_text, "footer")
+        self.footer.original_widget = footer_text
         self.refresh_data(self.user_config["from_date"], self.user_config["to_date"], option)
 
     def show_edit_widget(self, option, edit_widget):
@@ -150,6 +163,7 @@ class MainFrame(urwid.Frame):
                                     min_width=20, min_height=9, top=-20)
             # Set the Overlay widget as the body of the frame
             self.body = overlay
+
         elif key == 'r':
             self.refresh_data(self.user_config["from_date"], self.user_config["to_date"])  # pass to_date as argument
         else:
@@ -176,7 +190,7 @@ class MainFrame(urwid.Frame):
             to_date,  # to_date passed as argument
             self.user_config["max_delta"],
             self.user_config["buying_power"],  # buying_power from user_config
-            sorting_method
+            self.current_sorting_method
             )
 
         # Update the main area with the new options
@@ -313,30 +327,6 @@ class MainFrame(urwid.Frame):
         # Set another alarm. The same user_data will be used again.
         loop.set_alarm_in(self.system_config['refresh_interval'], self.refresh_content, user_data=user_data)
 
-    # def on_new_value_entered(self, option, edit_widget):
-    #     # Update the selected configuration option with the new value
-    #     # Get the new value from the edit widget
-    #     new_value = edit_widget.get_edit_text()
-    #
-    #     # Validate the new value
-    #     validate_func = self.validation_functions[option]
-    #     if option == "dte_range_max":
-    #         dte_range_min = self.user_config["dte_range_min"]
-    #         is_valid, error_message = validate_func(dte_range_min, new_value)
-    #     else:
-    #         is_valid, error_message = validate_func(new_value)
-    #     # If the new value is not valid, show an error message and return
-    #     if not is_valid:
-    #         self.show_error_message(error_message)
-    #         return
-    #
-    #     # If the new value is valid, update the user config and save it
-    #     self.user_config[option] = new_value
-    #     save_user_config(self.user_config)
-    #
-    #     # Return to the main window
-    #     self.body = self.body[0]
-
     def show_error_message(self, error_message):
         # Create a new text widget with the error message
         error_text = urwid.Text(error_message)
@@ -425,7 +415,7 @@ class ConfigSetup(urwid.WidgetWrap):
 
         # Save the user configuration to a file
         try:
-            config_setup.save_config(self.user_config)
+            ConfigSetup.save_config(self.user_config)
         except RuntimeError:
             self.error_message.set_text("An error occurred while trying to save the configuration.")
             return
@@ -458,6 +448,7 @@ class ConfigurationOptions(urwid.ListBox):
         self.main_frame = main_frame
         self.user_config = user_config
         self.selected_option = None
+        self.current_sorting_method = "arr"
 
         # Create list of button widgets and corresponding edit widgets
         self.option_widgets = [
