@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 
 # Define the paths to the config files
@@ -40,7 +41,6 @@ def load_user_config():
         raise ValueError(f"Error: Unable to parse JSON data in user config file. JSONDecodeError: {e}")
 
 def create_user_config():
-    """Create the user config file with the max delta, DTE range, and buying power."""
     # Ask the user for the config values
     while True:
         try:
@@ -84,7 +84,9 @@ def create_user_config():
 def validate_max_delta(value):
     try:
         value = float(value)
+        logging.debug("konwersja do float udała się")
         if 0.0 <= value <= 1.0:
+            logging.debug("wartość jest OK")
             return True, None
         else:
             return False, "Delta range must be between 0.0 and 1.0."
@@ -103,7 +105,7 @@ def validate_dte_range_min(value):
 def validate_dte_range_max(dte_range_min, value):
     try:
         value = int(value)
-        if dte_range_min <= value <= 365:
+        if int(dte_range_min) <= value <= 365:
             return True, None
         else:
             return False, "Error: DTE range maximum must be between {} and 365: ".format(dte_range_min)
@@ -113,10 +115,10 @@ def validate_dte_range_max(dte_range_min, value):
 def validate_buying_power(value):
     try:
         value = float(value)
-        if 0 <= value <= 1000:
+        if value >= 1000:
             return True, None
         else:
-            return False, "Buying power must be greater than $1000."
+            return False, "Buying power must be greater than or equal to $1000."
     except ValueError:
         return False, "Invalid input. Please enter a valid number."
 

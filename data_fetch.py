@@ -1,5 +1,3 @@
-import logging
-
 import requests
 import sys
 import math
@@ -63,8 +61,8 @@ def filter_and_sort_options(data, max_delta, buying_power, sorting_method):
     options = sorted(options, key=lambda option: option.get(sorting_method, -1), reverse=True)[:5]
     return options
 
-
-def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_delta, buying_power, sorting_method):
+def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_delta, buying_power, sorting_method,
+                       finnhub_api_key):
     all_options = []
     for ticker in tickers:
         endpoint = f"https://api.tdameritrade.com/v1/marketdata/chains?apikey={api_key}&symbol={ticker}&contractType={contract_type}&fromDate={from_date.strftime('%Y-%m-%d')}&toDate={to_date.strftime('%Y-%m-%d')}"
@@ -75,10 +73,21 @@ def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_
             print(f"Error: Unable to fetch options for {ticker}.")
             continue
 
-        options = filter_and_sort_options(data, max_delta, buying_power, sorting_method)
+        options = filter_and_sort_options(data, float(max_delta), float(buying_power), sorting_method)
         # Add ticker value to each option dictionary
         for option in options:
             option["ticker"] = ticker
+
+            # Finnhub API request
+            finnhub_endpoint = f"https://finnhub.io/api/v1/calendar/earnings?from={from_date.strftime('%Y-%m-%d')}&to={to_date.strftime('%Y-%m-%d')}&symbol={ticker}&token={finnhub_api_key}"
+            earnings_data = requests.get(finnhub_endpoint).json()
+
+            # If 'earningsCalendar' key is present in the response and its list is not empty,
+            # add 'has_earnings' as True, else False
+            if earnings_data and "earningsCalendar" in earnings_data and earnings_data["earningsCalendar"]:
+                option["has_earnings"] = True
+            else:
+                option["has_earnings"] = False
 
         all_options.extend(options)
 
@@ -90,3 +99,30 @@ def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_
     # logging.debug(f'All options sorted by {sorting_method}')
 
     return all_options
+
+# def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_delta, buying_power, sorting_method):
+#     all_options = []
+#     for ticker in tickers:
+#         endpoint = f"https://api.tdameritrade.com/v1/marketdata/chains?apikey={api_key}&symbol={ticker}&contractType={contract_type}&fromDate={from_date.strftime('%Y-%m-%d')}&toDate={to_date.strftime('%Y-%m-%d')}"
+#         data = make_api_request(api_key, endpoint)
+#
+#         # Check if the 'putExpDateMap' key exists in the data
+#         if not data or "putExpDateMap" not in data:
+#             print(f"Error: Unable to fetch options for {ticker}.")
+#             continue
+#
+#         options = filter_and_sort_options(data, float(max_delta), float(buying_power), sorting_method)
+#         # Add ticker value to each option dictionary
+#         for option in options:
+#             option["ticker"] = ticker
+#
+#         all_options.extend(options)
+#
+#     # Sort all options regardless of their ticker
+#     if sorting_method == "message":
+#         all_options.sort(key=lambda option: option.get(sorting_method, ""), reverse=True)
+#     else:
+#         all_options.sort(key=lambda option: float(option.get(sorting_method, "Key not present")), reverse=True)
+#     # logging.debug(f'All options sorted by {sorting_method}')
+#
+#     return all_options

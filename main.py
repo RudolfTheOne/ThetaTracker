@@ -47,7 +47,8 @@ def format_option(option):
         ('default', f"ARR: "),
         ('bright cyan', f"{option['arr']}, "),
         ('default', f"No of Contracts to Write: "),
-        ('bright white,bold', f"{option['no_of_contracts_to_write']}")
+        ('bright white,bold', f"{option['no_of_contracts_to_write']}"),
+        ('default', " ⚠️  📆") if option["has_earnings"] else ('default', '')
     ])
 
     return urwid.Pile([row1, row2, row3])
@@ -127,7 +128,24 @@ class MainFrame(urwid.Frame):
                                   align='center', width=('relative', 50),
                                   valign='middle', height=('relative', 50),
                                   min_width=20, min_height=9)
+    def create_sorting_widget(self):
+        # Create a list of sorting options
+        sorting_options = ["arr", "premium_usd", "premium_per_day", "delta"]
 
+        # Create a SortingOptions widget
+        sorting_options_widget = SortingOptions(sorting_options, self.select_sorting_option)
+
+        # Add a frame around the SortingOptions widget
+        framed_widget = urwid.LineBox(sorting_options_widget, title="Select Sorting Option")
+
+        # Create an Overlay widget with the SortingOptions widget on top of the current body
+        overlay = urwid.Overlay(framed_widget, self.body,
+                                align='center', width=('relative', 20),
+                                valign='middle', height=('relative', 10),
+                                min_width=20, min_height=9, top=-20)
+
+        # Return the created widget
+        return overlay
     def keypress(self, size, key):
         if key == 'q':
             raise urwid.ExitMainLoop()
@@ -140,7 +158,7 @@ class MainFrame(urwid.Frame):
             configuration_options_widget = ConfigurationOptions(configuration_options, self.select_configuration_option, self, self.user_config)
 
             # Add a frame around the ConfigurationOptions widget
-            framed_widget = urwid.LineBox(configuration_options_widget, title="Update User Configuration")
+            framed_widget = urwid.LineBox(configuration_options_widget, title="Edit User Configuration")
 
             # Create an Overlay widget with the ConfigurationOptions widget on top of the current body
             overlay = urwid.Overlay(framed_widget, self.body,
@@ -151,23 +169,7 @@ class MainFrame(urwid.Frame):
             # Set the Overlay widget as the body of the frame
             self.body = overlay
         elif key == 's':
-            # Create a list of sorting options
-            sorting_options = ["arr", "premium_usd", "premium_per_day", "delta"]
-
-            # Create a SortingOptions widget
-            sorting_options_widget = SortingOptions(sorting_options, self.select_sorting_option)
-
-            # Add a frame around the SortingOptions widget
-            framed_widget = urwid.LineBox(sorting_options_widget, title="Select Sorting Option")
-
-            # Create an Overlay widget with the SortingOptions widget on top of the current body
-            overlay = urwid.Overlay(framed_widget, self.body,
-                                    align='center', width=('relative', 20),
-                                    valign='middle', height=('relative', 10),
-                                    min_width=20, min_height=9, top=-20)
-            # Set the Overlay widget as the body of the frame
-            self.body = overlay
-
+            self.body = self.create_sorting_widget()
         elif key == 'r':
             self.refresh_data(self.user_config["from_date"], self.user_config["to_date"])  # pass to_date as argument
         else:
@@ -194,7 +196,8 @@ class MainFrame(urwid.Frame):
             to_date,  # to_date passed as argument
             self.user_config["max_delta"],
             self.user_config["buying_power"],  # buying_power from user_config
-            sorting_method
+            sorting_method,
+            self.system_config["finnhub_api_key"]
             )
 
         # Update the main area with the new options
@@ -261,7 +264,8 @@ class MainFrame(urwid.Frame):
             to_date,
             new_config["max_delta"],
             new_config["buying_power"],
-            new_config["default_sorting_method"]
+            new_config["default_sorting_method"],
+            self.system_config["finnhub_api_key"]
         )
 
         # Update the options list
@@ -296,19 +300,43 @@ class MainFrame(urwid.Frame):
                 new_value = original_widget.focus.get_label()
         else:
             new_value = edit_widget.get_edit_text()
+        logging.debug(f'Selected option from the user-config widget: {option}')
+        logging.debug(f'New value from user-config widget: {new_value}')
 
-        # Validate the new value
-        validate_func = self.validation_functions[option]
-        if option == "dte_range_max":
-            dte_range_min = self.user_config["dte_range_min"]
-            is_valid, error_message = validate_func(dte_range_min, new_value)
-        else:
-            is_valid, error_message = validate_func(new_value)
+        # Validate the new value only for specified options
+        if option in ["max_delta", "dte_range_min", "dte_range_max", "buying_power"]:
+            validate_func = self.validation_functions[option]
+            logging.debug("Walidacja wartości liczbowych")
 
-        # If the new value is not valid, show an error message and return
-        if not is_valid:
-            self.show_error_message(error_message)
-            return
+            if option == "dte_range_max":
+                dte_range_min = self.user_config["dte_range_min"]
+                is_valid, error_message = validate_func(dte_range_min, new_value)
+                if not is_valid:
+                    self.show_error_message(error_message)
+                    return
+            else:
+                is_valid, error_message = validate_func(new_value)
+                if not is_valid:
+                    self.show_error_message(error_message)
+                    return
+
+        elif option == "default_sorting_method":
+            logging.debug("wybrany default_sorting_method")
+            self.user_config[option] = new_value
+            # Create sorting ListBox and wrap it in LineBox
+            sorting_widget = self.create_sorting_widget()
+            sorting_linebox = urwid.LineBox(sorting_widget, title="Select sorting method")
+
+            # Create an Overlay with the sorting LineBox on top of the current body
+            overlay = urwid.Overlay(sorting_linebox, self.body,
+                                    align='center', width=('relative', 20),
+                                    valign='middle', height=('relative', 10),
+                                    min_width=20, min_height=9, top=-20)
+
+            # Set the Overlay as the body of the frame
+            self.body = overlay
+            if self.loop is not None:
+                self.loop.draw_screen()
 
         # If the new value is valid, update the user config and save it
         self.user_config[option] = new_value
@@ -323,6 +351,15 @@ class MainFrame(urwid.Frame):
         user_config_to_save.pop('to_date', None)
 
         save_user_config(user_config_to_save)
+
+        # Update the footer text
+        footer_text = urwid.Text([
+            "q: exit app, c: configuration setup, s: sort by (now: {} desc.), r: forced refresh".format(
+                user_config_to_save["default_sorting_method"])
+        ])
+        self.footer = urwid.AttrMap(footer_text, "footer")
+        if self.loop is not None:
+            self.loop.draw_screen()
 
         # Return to the main window
         self.body = self.body[0]
@@ -414,10 +451,10 @@ class ConfigSetup(urwid.WidgetWrap):
             return
 
         # Save the new configuration values to the user configuration file
-        self.user_config["max_delta"] = max_delta
-        self.user_config["dte_range_min"] = dte_range_min
-        self.user_config["dte_range_max"] = dte_range_max
-        self.user_config["buying_power"] = buying_power
+        self.user_config["max_delta"] = float(max_delta)
+        self.user_config["dte_range_min"] = int(dte_range_min)
+        self.user_config["dte_range_max"] = int(dte_range_max)
+        self.user_config["buying_power"] = float(buying_power)
         self.user_config["default_sorting_method"] = sorting_method
 
         # Save the user configuration to a file
@@ -439,14 +476,26 @@ class ConfigurationOptions(urwid.ListBox):
         self.current_sorting_method = "arr"
 
         # Create list of button widgets and corresponding edit widgets
-        self.option_widgets = [
-            (urwid.AttrMap(urwid.Button(option, on_press=self.on_option_selected), None, 'reversed'),
-             urwid.Edit(caption='', edit_text=str(self.user_config[option])))
-            for option in options
-        ]
+        self.option_widgets = []
+        for option in options:
+            button = urwid.AttrMap(urwid.Button(option, on_press=self.on_option_selected), None, 'reversed')
+            if option == "default_sorting_method":
+                # Use a ListBox for the "default_sorting_method" option
+                listbox = main_frame.create_sorting_widget()
+                widget = (button, listbox)
+            else:
+                widget = (button, urwid.Edit(caption='', edit_text=str(self.user_config[option])))
+            self.option_widgets.append(widget)
 
         # Call ListBox constructor with SimpleFocusListWalker
         super().__init__(urwid.SimpleFocusListWalker([widget[0] for widget in self.option_widgets]))
+
+        # # Create list of button widgets and corresponding edit widgets
+        # self.option_widgets = [
+        #     (urwid.AttrMap(urwid.Button(option, on_press=self.on_option_selected), None, 'reversed'),
+        #      urwid.Edit(caption='', edit_text=str(self.user_config[option])))
+        #     for option in options
+        # ]
 
     def on_option_selected(self, button):
         # Find the corresponding edit widget
@@ -488,7 +537,9 @@ def main():
     user_config["from_date"] = from_date
     user_config["to_date"] = to_date
 
-    options = fetch_option_chain(system_config["api_key"], user_config["tickers"], "PUT", from_date, to_date, user_config["max_delta"], user_config["buying_power"], user_config["default_sorting_method"])
+    options = fetch_option_chain(system_config["api_key"], user_config["tickers"], "PUT", from_date, to_date,
+                                 user_config["max_delta"], user_config["buying_power"],
+                                 user_config["default_sorting_method"], system_config["finnhub_api_key"])
 
     palette = [
         ("header", "white", "dark red"),
