@@ -1,3 +1,5 @@
+import logging
+
 import requests
 import sys
 import math
@@ -54,12 +56,13 @@ def filter_and_sort_options(data, max_delta, buying_power, sorting_method):
                     option["premium_usd"] = round(option["no_of_contracts_to_write"] * float(option["bid"]) * 100, 2)
                     option["premium_per_day"] = round(option["premium_usd"] / option["daysToExpiration"] \
                                                       if option["daysToExpiration"] != 0 else \
-                    option["premium_usd"], 2)
+                                                      option["premium_usd"], 2)
                     option["arr"] = round(option["premium_usd"] / buying_power * 365 / int(option["daysToExpiration"]) * 100, 3)
                     options.append(option)
 
     options = sorted(options, key=lambda option: option.get(sorting_method, -1), reverse=True)[:5]
     return options
+
 
 def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_delta, buying_power, sorting_method):
     all_options = []
@@ -78,5 +81,12 @@ def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_
             option["ticker"] = ticker
 
         all_options.extend(options)
+
+    # Sort all options regardless of their ticker
+    if sorting_method == "message":
+        all_options.sort(key=lambda option: option.get(sorting_method, ""), reverse=True)
+    else:
+        all_options.sort(key=lambda option: float(option.get(sorting_method, "Key not present")), reverse=True)
+    # logging.debug(f'All options sorted by {sorting_method}')
 
     return all_options

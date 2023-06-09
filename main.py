@@ -4,6 +4,7 @@ from config_setup import load_user_config, load_system_config, save_user_config
 from config_setup import validate_max_delta, validate_dte_range_min, validate_dte_range_max, \
     validate_buying_power
 from data_fetch import is_market_open, fetch_option_chain
+import logging
 
 def format_option(option):
     if "message" in option:
@@ -109,6 +110,9 @@ class MainFrame(urwid.Frame):
         ])
         footer_text = urwid.AttrMap(footer_text, "footer")
         self.footer.original_widget = footer_text
+
+        # logging.debug(f'Sorting option changed to: {option}')
+
         self.refresh_data(self.user_config["from_date"], self.user_config["to_date"], option)
 
     def show_edit_widget(self, option, edit_widget):
@@ -190,14 +194,15 @@ class MainFrame(urwid.Frame):
             to_date,  # to_date passed as argument
             self.user_config["max_delta"],
             self.user_config["buying_power"],  # buying_power from user_config
-            self.current_sorting_method
+            sorting_method
             )
 
         # Update the main area with the new options
-        self.main_area.body = urwid.SimpleListWalker(
+        options_list = urwid.SimpleListWalker(
             [format_option(option) for option in options] + [urwid.Divider('-')]
         )
-
+        self.main_area = urwid.ListBox(options_list)
+        self.main_area = urwid.Pile([self.main_area])
         # Update the header
         self.refresh_header()
 
@@ -205,7 +210,8 @@ class MainFrame(urwid.Frame):
         self.body = self.main_area
 
         # Redraw the screen
-        self.loop.draw_screen()
+        if self.loop is not None:
+            self.loop.draw_screen()
 
     def refresh_header(self):
         self.header_text.set_text([
@@ -263,6 +269,7 @@ class MainFrame(urwid.Frame):
             [format_option(option) for option in options] + [urwid.Divider('-')]
         )
         self.main_area = urwid.ListBox(options_list)
+        self.main_area = urwid.Pile([self.main_area])
         self.body = self.main_area  # If main_area is indeed the body
 
         # Update the footer text
@@ -338,8 +345,8 @@ class MainFrame(urwid.Frame):
         self.footer = error_widget
 
         # Draw the screen to show the changes
-        self.loop.draw_screen()
-
+        if self.loop is not None:
+            self.loop.draw_screen()
 class ConfigSetup(urwid.WidgetWrap):
     def __init__(self, user_config, close_callback):
         self.user_config = user_config
@@ -422,25 +429,6 @@ class ConfigSetup(urwid.WidgetWrap):
 
         self.close_callback()
 
-    # def show_user_config_widget(self, loop, callback):
-    #     # Create a UserConfigWidget
-    #     user_config_widget = UserConfigWidget(callback)
-    #
-    #     # Add a frame around the UserConfigWidget
-    #     framed_widget = urwid.LineBox(user_config_widget, title="Create User Config")
-    #
-    #     # Create an Overlay widget with the UserConfigWidget on top of the current body
-    #     overlay = urwid.Overlay(framed_widget, self.body,
-    #                             align='center', width=('relative', 60),
-    #                             valign='middle', height=('relative', 40),
-    #                             min_width=20, min_height=9)
-    #
-    #     # Set the Overlay widget as the body of the frame
-    #     self.body = overlay
-    #
-    #     # Connect the 'close' signal to restore the original body
-    #     urwid.connect_signal(user_config_widget, 'close', lambda widget: setattr(self, 'body', self.body[1]))
-
 class ConfigurationOptions(urwid.ListBox):
     def __init__(self, options, callback, main_frame, user_config):
         self.callback = callback
@@ -486,6 +474,8 @@ def main():
     # Load the user and system configurations
     system_config = load_system_config()
     user_config = load_user_config()
+
+    logging.basicConfig(filename='debug.log', level=logging.DEBUG)
 
     # Check if the market is open
     is_open = is_market_open(system_config["api_key"])
@@ -533,6 +523,7 @@ def main():
         [format_option(option) for option in options] + [urwid.Divider('-')]
     )
     main_area = urwid.ListBox(options_list)
+    main_area = urwid.Pile([main_area])
 
     # Create the footer
     footer_text = urwid.Text([
