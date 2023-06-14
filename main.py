@@ -147,7 +147,13 @@ class MainFrame(urwid.Frame):
         # Return the created widget
         return overlay
     def keypress(self, size, key):
-        if key == 'q':
+        if key == 'esc':
+            # Handle 'esc' key event here, restore the main window.
+            if isinstance(self.body, urwid.Overlay):
+                self.body = self.body[0]
+            else:
+                return super().keypress(size, key)
+        elif key == 'q':
             raise urwid.ExitMainLoop()
         elif key == 'c':
             # Create a list of configuration options
@@ -187,7 +193,6 @@ class MainFrame(urwid.Frame):
         self.set_body(self.main_area)
 
     def refresh_data(self, from_date, to_date, sorting_method="arr"):
-        # Fetch the new data from the API
         options = fetch_option_chain(
             self.system_config["api_key"],
             self.user_config["tickers"],
@@ -211,7 +216,6 @@ class MainFrame(urwid.Frame):
 
         # Restore the main area as the body of the frame
         self.body = self.main_area
-
         # Redraw the screen
         if self.loop is not None:
             self.loop.draw_screen()
@@ -231,7 +235,6 @@ class MainFrame(urwid.Frame):
         # Add a frame around the ConfigSetup widget
         framed_widget = urwid.LineBox(config_setup_widget, title="Setup User Config")
 
-        # Create an Overlay widget with the ConfigSetup widget on top of the current body
         overlay = urwid.Overlay(framed_widget, self.body,
                                 align='center', width=('relative', 60),
                                 valign='middle', height=('relative', 60),
@@ -576,7 +579,6 @@ def main():
     main_area = urwid.ListBox(options_list)
     main_area = urwid.Pile([main_area])
 
-    # Create the footer
     footer_text = urwid.Text([
         "q: exit app, c: configuration setup, s: sort by (now: {} desc.), r: forced refresh".format(user_config["default_sorting_method"])
     ])
@@ -584,11 +586,7 @@ def main():
 
     # Create the layout
     layout = MainFrame(main_area, header=header, footer=footer, user_config=user_config, system_config=system_config)
-
-    # Create the main loop
     loop = urwid.MainLoop(layout, palette=palette)
-
-    # Update the layout with the loop
     layout.loop = loop
 
     loop.set_alarm_in(
@@ -597,7 +595,6 @@ def main():
         user_data={'from_date': from_date, 'to_date': to_date}
     )
 
-    # Now load the config
     config = load_user_config()
 
     # If the config was not loaded, show user config widget
