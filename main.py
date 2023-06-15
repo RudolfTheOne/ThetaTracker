@@ -114,6 +114,18 @@ class MainFrame(urwid.Frame):
 
         # logging.debug(f'Sorting option changed to: {option}')
 
+        # Create a copy of the user config and remove unwanted fields
+        user_config_to_save = self.user_config.copy()
+        user_config_to_save['max_delta'] = float(user_config_to_save['max_delta'])
+        user_config_to_save['dte_range_min'] = int(user_config_to_save['dte_range_min'])
+        user_config_to_save['dte_range_max'] = int(user_config_to_save['dte_range_max'])
+        user_config_to_save['buying_power'] = float(user_config_to_save['buying_power'])
+        user_config_to_save['default_sorting_method'] = str(user_config_to_save['default_sorting_method'])
+        user_config_to_save.pop('from_date', None)
+        user_config_to_save.pop('to_date', None)
+
+        save_user_config(user_config_to_save)
+
         self.refresh_data(self.tickers, self.user_config["from_date"], self.user_config["to_date"], option)
 
     # def show_edit_widget(self, option, edit_widget):
