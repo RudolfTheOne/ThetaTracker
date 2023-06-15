@@ -15,7 +15,7 @@ def format_option(option):
 
     row1 = urwid.Text([
         ('default', f"\nTicker: "),
-        ('bright white', f"{option['ticker']}, "),
+        ('bright white', f"{option['ticker']} [{option['line_number']}], "),
         ('default', f"Bid Price: ${option['bid']}, Ask Price: ${option['ask']}, "),
         ('default', f"Bid Size: "),
         ('dark green', f"{option['bidSize']}, "),
@@ -45,7 +45,7 @@ def format_option(option):
         ('bright green,bold', f"${option['premium_usd']}, "),
         ('default', f"Premium per Day: ${option['premium_per_day']}, "),
         ('default', f"ARR: "),
-        ('bright cyan', f"{option['arr']}, "),
+        ('bright cyan', f"{option['arr']}%, "),
         ('default', f"No of Contracts to Write: "),
         ('bright white,bold', f"{option['no_of_contracts_to_write']}"),
         ('default', " ⚠️  📆") if option["has_earnings"] else ('default', '')

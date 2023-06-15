@@ -7,7 +7,7 @@ SYSTEM_CONFIG_PATH = "theta_tracker_system.conf"
 USER_CONFIG_PATH = "theta_tracker_user.conf"
 
 def read_tickers(file_path):
-    default_tickers = ["SPY"]
+    default_tickers = [("SPY", 0)]  # Include index in tuple
     try:
         with open(file_path, 'r') as file:
             tickers = file.read().splitlines()
@@ -15,7 +15,7 @@ def read_tickers(file_path):
             if not tickers:
                 print(f"No tickers found in the file. Using default: {default_tickers}")
                 return default_tickers
-            return tickers
+            return [(ticker, idx+1) for idx, ticker in enumerate(tickers)]  # Returns list of tuples
     except FileNotFoundError:
         print(f"File not found at path: {file_path}. Using default: {default_tickers}")
         return default_tickers
