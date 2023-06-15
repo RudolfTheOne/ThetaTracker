@@ -128,18 +128,6 @@ class MainFrame(urwid.Frame):
 
         self.refresh_data(self.tickers, self.user_config["from_date"], self.user_config["to_date"], option)
 
-    # def show_edit_widget(self, option, edit_widget):
-    #     # This method is a callback for when a configuration option has been selected.
-    #     # It displays an input field for entering a new value for the option.
-    #
-    #     # Remove the ConfigurationOptions widget
-    #     self.body = self.body[0]
-    #
-    #     # Show the edit widget
-    #     self.body = urwid.Overlay(edit_widget, self.body,
-    #                               align='center', width=('relative', 50),
-    #                               valign='middle', height=('relative', 50),
-    #                               min_width=20, min_height=9)
     def create_sorting_widget(self):
         # Create a list of sorting options
         sorting_options = ["arr", "premium_usd", "premium_per_day", "delta"]
@@ -192,13 +180,6 @@ class MainFrame(urwid.Frame):
         else:
             return super().keypress(size, key)
 
-    # def open_config_setup(self):
-    #     # Create the configuration setup screen
-    #     config_setup = ConfigSetup(self.user_config, self.close_config_setup)
-    #
-    #     # Switch to the configuration setup screen
-    #     self.set_body(config_setup)
-
     def close_config_setup(self):
         # Switch back to the main screen
         self.set_body(self.main_area)
@@ -241,22 +222,6 @@ class MainFrame(urwid.Frame):
             ("header", ", "),
             ("header", "Market: "), ("header-bold", "Open" if is_market_open(self.system_config["api_key"]) else "Closed")
         ])
-    # def show_config_setup(self):
-    #     config_setup_widget = ConfigSetup(self.user_config, self.close_config_setup)
-    #     # Add a frame around the ConfigSetup widget
-    #     framed_widget = urwid.LineBox(config_setup_widget, title="Setup User Config")
-    #
-    #     overlay = urwid.Overlay(framed_widget, self.body,
-    #                             align='center', width=('relative', 60),
-    #                             valign='middle', height=('relative', 60),
-    #                             min_width=20, min_height=9)
-    #
-    #     # Set the Overlay widget as the body of the frame
-    #     self.body = overlay
-
-    # def close_config_setup(self):
-    #     # Close the config setup dialog
-    #     self.body = self.body[1]
 
     def apply_config(self, new_config, tickers):
         # Update the user_config
@@ -362,9 +327,10 @@ class MainFrame(urwid.Frame):
         # Return to the main window
         self.body = self.body[0]
 
-    def refresh_content(self, loop, user_data, tickers):
+    def refresh_content(self, loop, user_data):
         from_date = user_data['from_date']  # get from user_data
         to_date = user_data['to_date']  # get from user_data
+        tickers = user_data['tickers']
         self.refresh_data(tickers, from_date, to_date)
         # Set another alarm. The same user_data will be used again.
         loop.set_alarm_in(self.system_config['refresh_interval'], self.refresh_content, user_data=user_data)
@@ -382,6 +348,7 @@ class MainFrame(urwid.Frame):
         # Draw the screen to show the changes
         if self.loop is not None:
             self.loop.draw_screen()
+
 class ConfigSetup(urwid.WidgetWrap):
     def __init__(self, user_config, close_callback):
         self.user_config = user_config
@@ -530,6 +497,7 @@ def main():
     user_config["from_date"] = from_date
     user_config["to_date"] = to_date
 
+    print("Loading options...")
     options = fetch_option_chain(system_config["api_key"], tickers, "PUT", from_date, to_date,
                                  user_config["max_delta"], user_config["buying_power"],
                                  user_config["default_sorting_method"], system_config["finnhub_api_key"])
@@ -549,18 +517,6 @@ def main():
         ("error", "white", "dark red"),
     ]
 
-    # Create the user interface and display the options
-    # header_text = urwid.Text([
-    #     ("header-bold", "ThetaTracker"),
-    #     ("header", " - "),
-    #     ("header", "Date: "), ("header-bold", datetime.now().strftime("%Y-%m-%d %H:%M")),
-    #     ("header", ", "),
-    #     ("header", "Buying Power: "), ("header-bold", f"${user_config['buying_power']}"),
-    #     ("header", ", "),
-    #     ("header", "Market: "), ("header-bold", "Open" if is_market_open(system_config["api_key"]) else "Closed")
-    # ])
-
-    # header = urwid.AttrMap(header_text, "header")
     # Create the main area
     options_list = urwid.SimpleListWalker(
         [format_option(option) for option in options] + [urwid.Divider('-')]
@@ -581,7 +537,7 @@ def main():
     loop.set_alarm_in(
         system_config['refresh_interval'],
         layout.refresh_content,
-        user_data={'from_date': from_date, 'to_date': to_date}
+        user_data={'from_date': from_date, 'to_date': to_date, 'tickers': tickers}
     )
 
     config = load_user_config()
