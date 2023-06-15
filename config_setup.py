@@ -6,6 +6,23 @@ import os
 SYSTEM_CONFIG_PATH = "theta_tracker_system.conf"
 USER_CONFIG_PATH = "theta_tracker_user.conf"
 
+def read_tickers(file_path):
+    default_tickers = ["SPY"]
+    try:
+        with open(file_path, 'r') as file:
+            tickers = file.read().splitlines()
+            # Check if the file is not empty
+            if not tickers:
+                print(f"No tickers found in the file. Using default: {default_tickers}")
+                return default_tickers
+            return tickers
+    except FileNotFoundError:
+        print(f"File not found at path: {file_path}. Using default: {default_tickers}")
+        return default_tickers
+    except IOError:
+        print(f"Error reading file at path: {file_path}. Using default: {default_tickers}")
+        return default_tickers
+
 def create_system_config():
     """Create the system config file with the API key and refresh interval."""
     # Ask the user for the API key

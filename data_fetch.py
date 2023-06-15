@@ -1,6 +1,8 @@
 import requests
 import sys
 import math
+from dateutil.parser import parse
+from datetime import datetime
 
 def make_api_request(api_key, endpoint):
     """Make an API request to the given endpoint."""
@@ -20,7 +22,6 @@ def make_api_request(api_key, endpoint):
 
 def is_market_open(api_key):
     """Check if the market is open."""
-    # Define the API endpoint
     endpoint = f"https://api.tdameritrade.com/v1/marketdata/OPTION/hours?apikey={api_key}"
 
     data = make_api_request(api_key, endpoint)
@@ -30,9 +31,14 @@ def is_market_open(api_key):
         # Iterate over each product in the option market
         for product in data["option"].values():
             if "isOpen" in product and product["isOpen"]:
-                # Market is open for this product
-                return True
-        # No open market found
+                for session in product["sessionHours"]["regularMarket"]:
+                    start_time = parse(session["start"])
+                    end_time = parse(session["end"])
+                    current_time = datetime.now(start_time.tzinfo) # ensures the current time is timezone aware
+
+                    if start_time <= current_time <= end_time:
+                        # Market is open for this product
+                        return True
         return False
 
     print("Error: The API response did not contain the expected data.")
@@ -99,30 +105,3 @@ def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_
     # logging.debug(f'All options sorted by {sorting_method}')
 
     return all_options
-
-# def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_delta, buying_power, sorting_method):
-#     all_options = []
-#     for ticker in tickers:
-#         endpoint = f"https://api.tdameritrade.com/v1/marketdata/chains?apikey={api_key}&symbol={ticker}&contractType={contract_type}&fromDate={from_date.strftime('%Y-%m-%d')}&toDate={to_date.strftime('%Y-%m-%d')}"
-#         data = make_api_request(api_key, endpoint)
-#
-#         # Check if the 'putExpDateMap' key exists in the data
-#         if not data or "putExpDateMap" not in data:
-#             print(f"Error: Unable to fetch options for {ticker}.")
-#             continue
-#
-#         options = filter_and_sort_options(data, float(max_delta), float(buying_power), sorting_method)
-#         # Add ticker value to each option dictionary
-#         for option in options:
-#             option["ticker"] = ticker
-#
-#         all_options.extend(options)
-#
-#     # Sort all options regardless of their ticker
-#     if sorting_method == "message":
-#         all_options.sort(key=lambda option: option.get(sorting_method, ""), reverse=True)
-#     else:
-#         all_options.sort(key=lambda option: float(option.get(sorting_method, "Key not present")), reverse=True)
-#     # logging.debug(f'All options sorted by {sorting_method}')
-#
-#     return all_options
