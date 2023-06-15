@@ -3,7 +3,7 @@ import requests
 import sys
 import math
 from dateutil.parser import parse
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def make_api_request(api_key, endpoint):
     """Make an API request to the given endpoint."""
@@ -85,10 +85,11 @@ def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_
         # Add ticker value and line number to each option dictionary
         for option in options:
             option["ticker"] = ticker
-            option["line_number"] = line_number  # add line number here
+            option["line_number"] = line_number
 
-            # Finnhub API request
-            finnhub_endpoint = f"https://finnhub.io/api/v1/calendar/earnings?from={from_date.strftime('%Y-%m-%d')}&to={to_date.strftime('%Y-%m-%d')}&symbol={ticker}&token={finnhub_api_key}"
+            expiration_date = datetime.now() + timedelta(days=option["daysToExpiration"])
+            expiration_date_str = expiration_date.strftime('%Y-%m-%d')
+            finnhub_endpoint = f"https://finnhub.io/api/v1/calendar/earnings?from={from_date.strftime('%Y-%m-%d')}&to={expiration_date_str}&symbol={ticker}&token={finnhub_api_key}"
             response = requests.get(finnhub_endpoint)
 
             if response.status_code == 200 and response.text:
