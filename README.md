@@ -36,7 +36,7 @@ The meaning of the configuration options are:
 `dte_range_max` - this is a maximum number of days you want to consider when selling the option. In other words: second bracket of a time window for your trades. Valid values are between previously entered `dte_range_min` and `365`.
 
 `buying_power` - this is a buying power you want to take into account when trading. **The minimum value is 1000USD**. This might include your margin, but remember - **trading on margin increases your risk!**
-The general rule is that this is a hard limit when calculating possible positions by the application. In short: if you want to sell covered PUTs, put your available cash on trading account. If you want to sell naked - do what you want but be warned! 🤓
+The general rule is that this is a hard limit when calculating possible positions by the application. In short: if you want to sell cash secured PUTs, put your available cash on trading account. If you want to sell naked - do what you want but be warned! 🤓
 
 `default_sorting_method` - this parameter tells what should the app use to sort the possible option trades. You should by default use 'arr', as this gives utilizes to the maximum your capital in the assumed time period. Other possible values are: 
 
