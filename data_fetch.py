@@ -4,6 +4,7 @@ import sys
 import math
 from dateutil.parser import parse
 from datetime import datetime, timedelta
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
@@ -90,11 +91,19 @@ def fetch_option_for_ticker(api_key, ticker, line_number, contract_type, from_da
             options)
 
         finnhub_endpoint = f"https://finnhub.io/api/v1/calendar/earnings?from={from_date.strftime('%Y-%m-%d')}&to={expiration_date_str}&symbol={ticker}&token={finnhub_api_key}"
-        response = requests.get(finnhub_endpoint)
+        # Try the request up to two times (original try + 1 retry)
+        for _ in range(2):
+            response = requests.get(finnhub_endpoint)
+
+            if response.status_code == 429:
+                logging.error("Rate limit reached. Waiting 30 seconds before retrying...")
+                time.sleep(30)
+            else:
+                break
 
         if response.status_code == 200 and response.text:
             earnings_data = response.json()
-            has_earnings = earnings_data and "earningsCalendar" in earnings_data and earnings_data["earningsCalendar"]
+            has_earnings = earnings_data.get('earningsCalendar', []) != []
         else:
             logging.error(
                 f"Error: Unable to fetch earnings data for {ticker}. HTTP status code: {response.status_code}")
