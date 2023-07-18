@@ -4,6 +4,8 @@ import sys
 import math
 from dateutil.parser import parse
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 
 def make_api_request(api_key, endpoint):
     """Make an API request to the given endpoint."""
@@ -68,48 +70,51 @@ def filter_and_sort_options(data, max_delta, buying_power, sorting_method):
     options = sorted(options, key=lambda option: option.get(sorting_method, -1), reverse=True)[:5]
     return options
 
+def fetch_option_for_ticker(api_key, ticker, line_number, contract_type, from_date, to_date, max_delta, buying_power, sorting_method,
+                       finnhub_api_key):
+    endpoint = f"https://api.tdameritrade.com/v1/marketdata/chains?apikey={api_key}&symbol={ticker}&contractType={contract_type}&fromDate={from_date.strftime('%Y-%m-%d')}&toDate={to_date.strftime('%Y-%m-%d')}"
+    data = make_api_request(api_key, endpoint)
+
+    # Check if the 'putExpDateMap' key exists in the data
+    if not data or "putExpDateMap" not in data:
+        print(f"Error: Unable to fetch options for {ticker}.")
+        return []
+
+    options = filter_and_sort_options(data, float(max_delta), float(buying_power), sorting_method)
+
+    # Check if we have any options for the ticker
+    if options:
+        # Compute the maximum expiration_date_str for the current ticker
+        expiration_date_str = max(
+            (datetime.now() + timedelta(days=option["daysToExpiration"])).strftime('%Y-%m-%d') for option in
+            options)
+
+        finnhub_endpoint = f"https://finnhub.io/api/v1/calendar/earnings?from={from_date.strftime('%Y-%m-%d')}&to={expiration_date_str}&symbol={ticker}&token={finnhub_api_key}"
+        response = requests.get(finnhub_endpoint)
+
+        if response.status_code == 200 and response.text:
+            earnings_data = response.json()
+            has_earnings = earnings_data and "earningsCalendar" in earnings_data and earnings_data["earningsCalendar"]
+        else:
+            logging.error(
+                f"Error: Unable to fetch earnings data for {ticker}. HTTP status code: {response.status_code}")
+            has_earnings = False  # Default value if unable to fetch earnings data
+
+        for option in options:
+            option["ticker"] = ticker
+            option["line_number"] = line_number
+            option["has_earnings"] = has_earnings
+
+    return options
+
 
 def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_delta, buying_power, sorting_method,
                        finnhub_api_key):
     all_options = []
-    for ticker, line_number in tickers:  # unpack ticker and line number
-        endpoint = f"https://api.tdameritrade.com/v1/marketdata/chains?apikey={api_key}&symbol={ticker}&contractType={contract_type}&fromDate={from_date.strftime('%Y-%m-%d')}&toDate={to_date.strftime('%Y-%m-%d')}"
-        data = make_api_request(api_key, endpoint)
-
-        # Check if the 'putExpDateMap' key exists in the data
-        if not data or "putExpDateMap" not in data:
-            print(f"Error: Unable to fetch options for {ticker}.")
-            continue
-
-        options = filter_and_sort_options(data, float(max_delta), float(buying_power), sorting_method)
-
-        # Check if we have any options for the ticker
-        if options:
-            # Add ticker value and line number to each option dictionary
-
-            # Compute the maximum expiration_date_str for the current ticker
-            expiration_date_str = max(
-                (datetime.now() + timedelta(days=option["daysToExpiration"])).strftime('%Y-%m-%d') for option in
-                options)
-
-            finnhub_endpoint = f"https://finnhub.io/api/v1/calendar/earnings?from={from_date.strftime('%Y-%m-%d')}&to={expiration_date_str}&symbol={ticker}&token={finnhub_api_key}"
-            response = requests.get(finnhub_endpoint)
-
-            if response.status_code == 200 and response.text:
-                earnings_data = response.json()
-                has_earnings = earnings_data and "earningsCalendar" in earnings_data and earnings_data[
-                    "earningsCalendar"]
-            else:
-                logging.error(
-                    f"Error: Unable to fetch earnings data for {ticker}. HTTP status code: {response.status_code}")
-                has_earnings = False  # Default value if unable to fetch earnings data
-
-            for option in options:
-                option["ticker"] = ticker
-                option["line_number"] = line_number
-                option["has_earnings"] = has_earnings
-
-            all_options.extend(options)
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(fetch_option_for_ticker, api_key, ticker, line_number, contract_type, from_date, to_date, max_delta, buying_power, sorting_method, finnhub_api_key) for ticker, line_number in tickers]
+        for future in as_completed(futures):
+            all_options.extend(future.result())
 
     # Sort all options regardless of their ticker
     if sorting_method == "message":
