@@ -80,6 +80,8 @@ class MainFrame(urwid.Frame):
         self.tickers = tickers
         self.loop = loop
         self.current_sorting_method = user_config["default_sorting_method"] if user_config else "arr"
+        self.filter_earnings = False
+        self.fetched_options = []
 
         # Create header_text and main_area here
         self.header_text = urwid.Text([
@@ -177,6 +179,9 @@ class MainFrame(urwid.Frame):
             self.body = self.create_sorting_widget()
         elif key == 'r':
             self.refresh_data(self.tickers, self.user_config["from_date"], self.user_config["to_date"])
+        elif key == 'e':
+            self.filter_earnings = not self.filter_earnings
+            self.refresh_display()
         else:
             return super().keypress(size, key)
 
@@ -185,7 +190,7 @@ class MainFrame(urwid.Frame):
         self.set_body(self.main_area)
 
     def refresh_data(self, tickers, from_date, to_date, sorting_method="arr"):
-        options = fetch_option_chain(
+        self.fetched_options = fetch_option_chain(
             self.system_config["api_key"],
             tickers,
             "PUT",
@@ -196,19 +201,20 @@ class MainFrame(urwid.Frame):
             sorting_method,
             self.system_config["finnhub_api_key"]
             )
+        self.refresh_display()
 
-        # Update the main area with the new options
+    def refresh_display(self):
+        displayed_options = [option for option in self.fetched_options if
+                             not (self.filter_earnings and option["has_earnings"])]
+
         options_list = urwid.SimpleListWalker(
-            [format_option(option) for option in options] + [urwid.Divider('-')]
+            [format_option(option) for option in displayed_options] + [urwid.Divider('-')]
         )
         self.main_area = urwid.ListBox(options_list)
         self.main_area = urwid.Pile([self.main_area])
-        # Update the header
         self.refresh_header()
 
-        # Restore the main area as the body of the frame
         self.body = self.main_area
-        # Redraw the screen
         if self.loop is not None:
             self.loop.draw_screen()
 
@@ -258,7 +264,7 @@ class MainFrame(urwid.Frame):
 
         # Update the footer text
         footer_text = urwid.Text([
-            "q: exit app, c: configuration setup, s: sort by (now: {} desc.), r: forced refresh".format(
+            "q: exit app, c: configuration setup, s: sort by (now: {} desc.), e: filter out stocks with earnings, r: forced refresh".format(
                 new_config["default_sorting_method"])
         ])
         self.footer = urwid.AttrMap(footer_text, "footer")
@@ -266,7 +272,6 @@ class MainFrame(urwid.Frame):
             self.loop.draw_screen()
 
     def select_configuration_option(self, option, edit_widget):
-        logging.debug('Entering select_configuration_option function.')
         # Update the selected configuration option with the new value
         if isinstance(edit_widget, urwid.ListBox):
             # For ListBox, get the label of the item in focus
@@ -281,13 +286,10 @@ class MainFrame(urwid.Frame):
                 new_value = original_widget.focus.get_label()
         else:
             new_value = edit_widget.get_edit_text()
-        logging.debug(f'Selected option from the user-config widget: {option}')
-        logging.debug(f'New value from user-config widget: {new_value}')
 
         # Validate the new value only for specified options
         if option in ["max_delta", "dte_range_min", "dte_range_max", "buying_power"]:
             validate_func = self.validation_functions[option]
-            logging.debug("Validation of the numerical values")
 
             if option == "dte_range_max":
                 dte_range_min = self.user_config["dte_range_min"]
@@ -531,6 +533,7 @@ def main():
 
     # Create the layout
     layout = MainFrame(main_area, footer=footer, user_config=user_config, system_config=system_config, tickers=tickers)
+    layout.fetched_options = options
     loop = urwid.MainLoop(layout, palette=palette)
     layout.loop = loop
 
