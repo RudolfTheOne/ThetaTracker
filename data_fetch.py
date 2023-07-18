@@ -97,7 +97,7 @@ def fetch_option_for_ticker(api_key, ticker, line_number, contract_type, from_da
 
             if response.status_code == 429:
                 logging.error("Rate limit reached. Waiting 30 seconds before retrying...")
-                time.sleep(30)
+                time.sleep(50)
             else:
                 break
 
