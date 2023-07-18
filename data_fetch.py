@@ -114,8 +114,7 @@ def fetch_option_for_ticker(api_key, ticker, line_number, contract_type, from_da
             option["line_number"] = line_number
             option["has_earnings"] = has_earnings
 
-    logging.info('Options: %s', options)
-
+    # logging.info('Options: %s', options)
     return options
 
 
