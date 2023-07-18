@@ -83,24 +83,26 @@ def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_
 
         options = filter_and_sort_options(data, float(max_delta), float(buying_power), sorting_method)
         # Add ticker value and line number to each option dictionary
+
+        # Compute the maximum expiration_date_str for the current ticker
+        expiration_date_str = max(
+            (datetime.now() + timedelta(days=option["daysToExpiration"])).strftime('%Y-%m-%d') for option in options)
+
+        finnhub_endpoint = f"https://finnhub.io/api/v1/calendar/earnings?from={from_date.strftime('%Y-%m-%d')}&to={expiration_date_str}&symbol={ticker}&token={finnhub_api_key}"
+        response = requests.get(finnhub_endpoint)
+
+        if response.status_code == 200 and response.text:
+            earnings_data = response.json()
+            has_earnings = earnings_data and "earningsCalendar" in earnings_data and earnings_data["earningsCalendar"]
+        else:
+            logging.error(
+                f"Error: Unable to fetch earnings data for {ticker}. HTTP status code: {response.status_code}")
+            has_earnings = False  # Default value if unable to fetch earnings data
+
         for option in options:
             option["ticker"] = ticker
             option["line_number"] = line_number
-
-            expiration_date = datetime.now() + timedelta(days=option["daysToExpiration"])
-            expiration_date_str = expiration_date.strftime('%Y-%m-%d')
-            finnhub_endpoint = f"https://finnhub.io/api/v1/calendar/earnings?from={from_date.strftime('%Y-%m-%d')}&to={expiration_date_str}&symbol={ticker}&token={finnhub_api_key}"
-            response = requests.get(finnhub_endpoint)
-
-            if response.status_code == 200 and response.text:
-                earnings_data = response.json()
-                if earnings_data and "earningsCalendar" in earnings_data and earnings_data["earningsCalendar"]:
-                    option["has_earnings"] = True
-                else:
-                    option["has_earnings"] = False
-            else:
-                logging.error(f"Error: Unable to fetch earnings data for {ticker}. HTTP status code: {response.status_code}")
-                option["has_earnings"] = False  # Default value if unable to fetch earnings data
+            option["has_earnings"] = has_earnings
 
         all_options.extend(options)
 
@@ -109,7 +111,5 @@ def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_
         all_options.sort(key=lambda option: option.get(sorting_method, ""), reverse=True)
     else:
         all_options.sort(key=lambda option: float(option.get(sorting_method, "Key not present")), reverse=True)
-    # logging.debug(f'All options sorted by {sorting_method}')
 
     return all_options
-
