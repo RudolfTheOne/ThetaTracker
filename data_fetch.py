@@ -90,13 +90,13 @@ def fetch_option_for_ticker(api_key, ticker, line_number, contract_type, from_da
             (datetime.now() + timedelta(days=option["daysToExpiration"])).strftime('%Y-%m-%d') for option in
             options)
 
-        finnhub_endpoint = f"https://finnhub.io/api/v1/calendar/earnings?from={from_date.strftime('%Y-%m-%d')}&to={expiration_date_str}&symbol={ticker}&token={finnhub_api_key}"
+        finnhub_endpoint = f"https://finnhub.io/api/v1/calendar/earnings?from={datetime.now().strftime('%Y-%m-%d')}&to={expiration_date_str}&symbol={ticker}&token={finnhub_api_key}"
         # Try the request up to two times (original try + 1 retry)
         for _ in range(2):
             response = requests.get(finnhub_endpoint)
 
             if response.status_code == 429:
-                logging.error("Rate limit reached. Waiting 30 seconds before retrying...")
+                logging.error("Rate limit reached. Waiting 50 seconds before retrying...")
                 time.sleep(50)
             else:
                 break
@@ -113,6 +113,8 @@ def fetch_option_for_ticker(api_key, ticker, line_number, contract_type, from_da
             option["ticker"] = ticker
             option["line_number"] = line_number
             option["has_earnings"] = has_earnings
+
+    logging.info('Options: %s', options)
 
     return options
 
