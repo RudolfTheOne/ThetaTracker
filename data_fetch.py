@@ -8,6 +8,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 RETRY_WAIT_SECS = 50
+STRIKE_COUNT_LIMIT = 20
 
 def make_api_request(api_key, endpoint):
     try:
@@ -83,7 +84,7 @@ def handle_api_error(ticker):
 def fetch_option_for_ticker(api_key, ticker, line_number, contract_type, from_date, to_date, max_delta, buying_power, sorting_method,
                        finnhub_api_key):
     try:
-        endpoint = f"https://api.tdameritrade.com/v1/marketdata/chains?apikey={api_key}&symbol={ticker}&contractType={contract_type}&fromDate={from_date.strftime('%Y-%m-%d')}&toDate={to_date.strftime('%Y-%m-%d')}"
+        endpoint = f"https://api.tdameritrade.com/v1/marketdata/chains?apikey={api_key}&symbol={ticker}&contractType={contract_type}&strikeCount={STRIKE_COUNT_LIMIT}&fromDate={from_date.strftime('%Y-%m-%d')}&toDate={to_date.strftime('%Y-%m-%d')}"
         data = make_api_request(api_key, endpoint)
 
         if not data or "putExpDateMap" not in data:
