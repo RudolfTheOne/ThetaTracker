@@ -21,8 +21,8 @@ def format_option(option):
         ('dark green', f"{option['bidSize']}, "),
         ('default', f"Ask Size: "),
         ('dark green', f"{option['askSize']}, "),
-        ('default', f"Volatility: "),
-        ('dark red', f"{option['volatility']}, "),
+        ('default', f"Stock IV: "),
+        ('dark red', f"{option['underlying_iv']}, "),
         ('default', f"Strike Price: ${option['strikePrice']}")
     ])
 

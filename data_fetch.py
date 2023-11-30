@@ -91,6 +91,7 @@ def fetch_option_for_ticker(api_key, ticker, line_number, contract_type, from_da
             handle_api_error(ticker)
             return []
 
+        volatility = data['volatility']
         options = filter_and_sort_options(data, float(max_delta), float(buying_power), sorting_method)
 
         # Check if we have any options for the ticker
@@ -123,6 +124,7 @@ def fetch_option_for_ticker(api_key, ticker, line_number, contract_type, from_da
                 option["ticker"] = ticker
                 option["line_number"] = line_number
                 option["has_earnings"] = has_earnings
+                option["underlying_iv"] = volatility
 
         return options
 
