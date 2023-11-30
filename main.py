@@ -486,7 +486,7 @@ def main():
     user_config = load_user_config()
     tickers = read_tickers(file_path)
 
-    logging.basicConfig(filename='debug.log', level=logging.DEBUG)
+    logging.basicConfig(filename='debug.log', level=logging.WARNING)
 
     # Check if the market is open
     is_open = is_market_open(system_config["api_key"])

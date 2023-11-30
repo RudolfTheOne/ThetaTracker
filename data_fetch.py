@@ -7,21 +7,25 @@ from datetime import datetime, timedelta
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+RETRY_WAIT_SECS = 50
 
 def make_api_request(api_key, endpoint):
-    """Make an API request to the given endpoint."""
     try:
         response = requests.get(endpoint)
     except requests.exceptions.RequestException as e:
-        print(f"Error: Unable to connect to the API. {e}")
-        return None
+        logging.error(f"Error connecting to API: {e}")
+        raise
 
-    # Check if the request was successful
-    if response.status_code != 200:
-        print(f"Error: Unable to fetch data. Status code: {response.status_code}")
-        sys.exit(1)
+    if response.status_code == 429:
+      logging.warning(f"Rate limited. Sleeping {RETRY_WAIT_SECS} seconds")
+      time.sleep(RETRY_WAIT_SECS)
 
-    return response.json()
+    elif response.status_code == 200:
+        return response.json()
+
+    else:
+        logging.error(f"Error fetching data from API. Status code: {response.status_code}")
+        raise Exception(f"API request failed with status {response.status_code}")
 
 
 def is_market_open(api_key):
@@ -71,60 +75,78 @@ def filter_and_sort_options(data, max_delta, buying_power, sorting_method):
     options = sorted(options, key=lambda option: option.get(sorting_method, -1), reverse=True)[:5]
     return options
 
+
+def handle_api_error(ticker):
+    logging.error(f"Error: Unable to make API request for {ticker}")
+
+
 def fetch_option_for_ticker(api_key, ticker, line_number, contract_type, from_date, to_date, max_delta, buying_power, sorting_method,
                        finnhub_api_key):
-    endpoint = f"https://api.tdameritrade.com/v1/marketdata/chains?apikey={api_key}&symbol={ticker}&contractType={contract_type}&fromDate={from_date.strftime('%Y-%m-%d')}&toDate={to_date.strftime('%Y-%m-%d')}"
-    data = make_api_request(api_key, endpoint)
+    try:
+        endpoint = f"https://api.tdameritrade.com/v1/marketdata/chains?apikey={api_key}&symbol={ticker}&contractType={contract_type}&fromDate={from_date.strftime('%Y-%m-%d')}&toDate={to_date.strftime('%Y-%m-%d')}"
+        data = make_api_request(api_key, endpoint)
 
-    # Check if the 'putExpDateMap' key exists in the data
-    if not data or "putExpDateMap" not in data:
-        print(f"Error: Unable to fetch options for {ticker}.")
-        return []
+        if not data or "putExpDateMap" not in data:
+            handle_api_error(ticker)
+            return []
 
-    options = filter_and_sort_options(data, float(max_delta), float(buying_power), sorting_method)
+        options = filter_and_sort_options(data, float(max_delta), float(buying_power), sorting_method)
 
-    # Check if we have any options for the ticker
-    if options:
-        # Compute the maximum expiration_date_str for the current ticker
-        expiration_date_str = max(
-            (datetime.now() + timedelta(days=option["daysToExpiration"])).strftime('%Y-%m-%d') for option in
-            options)
+        # Check if we have any options for the ticker
+        if options:
+            # Compute the maximum expiration_date_str for the current ticker
+            expiration_date_str = max(
+                (datetime.now() + timedelta(days=option["daysToExpiration"])).strftime('%Y-%m-%d') for option in
+                options)
 
-        finnhub_endpoint = f"https://finnhub.io/api/v1/calendar/earnings?from={datetime.now().strftime('%Y-%m-%d')}&to={expiration_date_str}&symbol={ticker}&token={finnhub_api_key}"
-        # Try the request up to two times (original try + 1 retry)
-        for _ in range(2):
-            response = requests.get(finnhub_endpoint)
+            finnhub_endpoint = f"https://finnhub.io/api/v1/calendar/earnings?from={datetime.now().strftime('%Y-%m-%d')}&to={expiration_date_str}&symbol={ticker}&token={finnhub_api_key}"
+            # Try the request up to two times (original try + 1 retry)
+            for _ in range(2):
+                response = requests.get(finnhub_endpoint)
 
-            if response.status_code == 429:
-                logging.error("Rate limit reached. Waiting 50 seconds before retrying...")
-                time.sleep(50)
+                if response.status_code == 429:
+                    logging.error("Rate limit reached. Waiting {RETRY_WAIT_SECS} seconds before retrying...")
+                    time.sleep(RETRY_WAIT_SECS)
+                else:
+                    break
+
+            if response.status_code == 200 and response.text:
+                earnings_data = response.json()
+                has_earnings = earnings_data.get('earningsCalendar', []) != []
             else:
-                break
+                logging.error(
+                    f"Error: Unable to fetch earnings data for {ticker}. HTTP status code: {response.status_code}")
+                has_earnings = False  # Default value if unable to fetch earnings data
 
-        if response.status_code == 200 and response.text:
-            earnings_data = response.json()
-            has_earnings = earnings_data.get('earningsCalendar', []) != []
-        else:
-            logging.error(
-                f"Error: Unable to fetch earnings data for {ticker}. HTTP status code: {response.status_code}")
-            has_earnings = False  # Default value if unable to fetch earnings data
+            for option in options:
+                option["ticker"] = ticker
+                option["line_number"] = line_number
+                option["has_earnings"] = has_earnings
 
-        for option in options:
-            option["ticker"] = ticker
-            option["line_number"] = line_number
-            option["has_earnings"] = has_earnings
+        return options
 
-    # logging.info('Options: %s', options)
-    return options
+    except requests.exceptions.RequestException as e:
+        handle_api_error(ticker)
+        logging.exception("There was an exception when making an API request.")
+        return []
 
 
 def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_delta, buying_power, sorting_method,
                        finnhub_api_key):
     all_options = []
+
     with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(fetch_option_for_ticker, api_key, ticker, line_number, contract_type, from_date, to_date, max_delta, buying_power, sorting_method, finnhub_api_key) for ticker, line_number in tickers]
+        futures = {
+            executor.submit(fetch_option_for_ticker, api_key, ticker, line_number, contract_type, from_date, to_date,
+                            max_delta, buying_power, sorting_method, finnhub_api_key): ticker for ticker, line_number in
+            tickers}
+
         for future in as_completed(futures):
-            all_options.extend(future.result())
+            exception = future.exception()
+            if exception is not None:
+                tickers.remove(futures[future])  # remove the ticker from the list
+            else:
+                all_options.extend(future.result())
 
     # Sort all options regardless of their ticker
     if sorting_method == "message":
