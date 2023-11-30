@@ -16,38 +16,44 @@ def format_option(option):
     row1 = urwid.Text([
         ('default', f"\nTicker: "),
         ('bright white', f"{option['ticker']} [{option['line_number']}], "),
-        ('default', f"Bid Price: ${option['bid']}, Ask Price: ${option['ask']}, "),
-        ('default', f"Bid Size: "),
+        ('default', f"Premium Total: "),
+        ('bright green,bold', f"${option['premium_usd']}, "),
+        ('default', f"(per day: ${option['premium_per_day']}), "),
+        ('default', f"ARR: "),
+        ('bright white', f"{option['arr']}%, "),
+        ('bright cyan', f"LIQ.: "),
+        ('default', f"BidSize: "),
         ('dark green', f"{option['bidSize']}, "),
-        ('default', f"Ask Size: "),
+        ('default', f"AskSize: "),
         ('dark green', f"{option['askSize']}, "),
-        ('default', f"Stock IV: "),
-        ('dark red', f"{option['underlying_iv']}, "),
-        ('default', f"Strike Price: ${option['strikePrice']}")
+        ('default', f"Spread: "),
+        ('bright green,bold', f"{round(((option['ask'] - option['bid']) / option['ask']), 2) * 100}%")
     ])
 
     row2 = urwid.Text([
-        ('default', f"   Description: "),
-        ('bright white,bold', f"{option['description']}, "),
+        ('dark red', f"   RISK: "),
+        ('default', f"PUT/CALL ratio: "),
+        ('bright white', f"11.0, "),
+        ('default', f"Stock IV: "),
+        ('bright white', f"{option['underlying_iv']}, "),
         ('default', f"Delta: "),
         ('bright white', f"{option['delta']}, "),
         ('default', f"Underlying price: $"),
-        ('bright purple', f"{round(option['underlyingPrice'], 2)} "),
+        ('dark green', f"{round(option['underlyingPrice'], 2)} "),
         ('bright white',
          f"(d: ${round(option['underlyingPrice'] - option['strikePrice'], 2)} "
-         f"{round((option['underlyingPrice'] - option['strikePrice']) / option['underlyingPrice'], 2)}%), "),
-        ('default', f"Days to Expiration: "),
-        ('bright white', f"{option['daysToExpiration']}")
+         f"{round((option['underlyingPrice'] - option['strikePrice']) / option['underlyingPrice'], 2)}%), ")
     ])
 
     row3 = urwid.Text([
-        ('default', f"   Premium Total: "),
-        ('bright green,bold', f"${option['premium_usd']}, "),
-        ('default', f"Premium per Day: ${option['premium_per_day']}, "),
-        ('default', f"ARR: "),
-        ('bright cyan', f"{option['arr']}%, "),
-        ('default', f"No of Contracts to Write: "),
-        ('bright white,bold', f"{option['no_of_contracts_to_write']}"),
+        ('bright white', f"   TRADE: "),
+        ('bright white,bold', f"{option['description']}, "),
+        ('default', f"Strike Price: "),
+        ('bright white', f"${option['strikePrice']}, "),
+        ('default', f"DTO: "),
+        ('bright white', f"{option['daysToExpiration']}, "),
+        ('default', f"Number to open: "),
+        ('bright purple', f"{option['no_of_contracts_to_write']} @ ${option['bid']}"),
         ('default', " ⚠️  📆") if option["has_earnings"] else ('default', '')
     ])
 
