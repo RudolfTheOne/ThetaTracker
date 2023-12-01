@@ -14,11 +14,11 @@ def format_option(option):
         return urwid.Pile([row1, row2, row3])
 
     if option['put_call_ratio'] > 1.1:
-        put_call_emoji = '⚠️'
+        put_call_emoji = '⚠️ '
     elif option['put_call_ratio'] < 0.9:
-        put_call_emoji = '✅'
+        put_call_emoji = '✅ '
     else:
-        put_call_emoji = '⚖️'
+        put_call_emoji = '⚖️ '
 
     row1 = urwid.Text([
         ('default', f"\nTicker: "),
@@ -57,7 +57,7 @@ def format_option(option):
         ('bright white,bold', f"{option['description']}, "),
         ('default', f"Strike Price: "),
         ('bright white', f"${option['strikePrice']}, "),
-        ('default', f"DTO: "),
+        ('default', f"DTE: "),
         ('bright white', f"{option['daysToExpiration']}, "),
         ('default', f"No to open: "),
         ('bright purple', f"{option['no_of_contracts_to_write']} @ ${option['bid']}"),
@@ -206,7 +206,6 @@ class MainFrame(urwid.Frame):
         self.fetched_options = fetch_option_chain(
             self.system_config["api_key"],
             tickers,
-            "PUT",
             from_date,  # from_date passed as argument
             to_date,  # to_date passed as argument
             self.user_config["max_delta"],

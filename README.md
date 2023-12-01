@@ -92,26 +92,37 @@ Bottom part of the interface gives you a brief overview of hotkeys, as:
 First row displays ticker along its position from the `tickers2watch.txt` file in the square 
 bracket. 
 The assumption is that if you sorted your tickers from best to worst, you might want to 
-consider that info when choosing the trade. Next are Bid and Ask prices along with their 
-sizes and Volatility followed by Strike Price.
+consider that info when choosing the trade. 
 
-Second row gives position description (along with type of the option), followed by the delta 
-value (remember - rule of thumb is **the lower delta, the less risky is the trade**), 
-underlying price followed by difference between this price and strike price (in the 
-bracket it will display `d: $2.0 0.04%` meaning the difference between the underlying price 
-and the strike price is 2 dollars which translates to 0.04% of the difference.). The last 
-value in the row is Days to Expiration.
-
-Third row displays the most essential data for the trader: **Premium Total** in USD - this 
+Next is the most essential data for the trader: **Premium Total** in USD - this 
 calculates the total premium you will get for selling the total number of contracts.
 
 **NOTE: this doesn't take into account your trade fees from your broker!**. 
 
 The next value says about premium you will earn per day (that's simply premium total 
-divided per days to expiration) followed by ARR. The ARR reflects the percentage rate of return 
+divided per days to expiration) followed by ARR. 
+
+The ARR (Annual Return Rate) reflects the percentage rate of return 
 expected on an investment extending the result on one trade to a full year. It's the most 
 useful indicator of how profitable your trade is in specific time window.
-The last constant thing displayed is Number of contracts to write: this tells you how many options you can sell having your previously defined buying power.
+
+Next are the values showing the Liquidity: BidSize, AskSize and the Spread as a percentage.
+
+Second row gives position RISK details: PUT/CALL ratio (telling you what's the market sentiment, ie how many 
+bullish trades to how many bearish trades are there on a market (based on the volume of both).
+You will see an emoji icon allowing you to assess the sentiment at a glance. 
+
+Next, there is a stock's IV (underlying's Internal Volatility) followed by the Delta value 
+(remember - rule of thumb is **the lower delta, the less risky is the trade**).
+
+Finally the underlying's price followed by difference between this price and the strike price (in the
+bracket it will display `d: $2.0 0.04%` meaning the difference between the underlying price 
+and the strike price is 2 dollars which translates to 0.04% of the difference.).
+
+Third row displays the details necessary for opening the trade: the option description, it's Strike Price, 
+Days to Expiration (DTE) and the number of contracts to write ("No to open"): this tells you 
+how many options you can sell having your previously defined buying power.
+
 Note: in case the specific trade's underlying has an earning report within defined time window, you will see a warning: ⚠️📆.
 
 ### Ending notes

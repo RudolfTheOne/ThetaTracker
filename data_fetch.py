@@ -92,7 +92,6 @@ def fetch_option_for_ticker(api_key, ticker, line_number, from_date, to_date, ma
             handle_api_error(ticker)
             return []
 
-        volatility = data['volatility']
         options = filter_and_sort_options(data, float(max_delta), float(buying_power), sorting_method)
 
         options = [option for option in options if option.get("put_call_ratio") != float('inf')]
@@ -127,7 +126,7 @@ def fetch_option_for_ticker(api_key, ticker, line_number, from_date, to_date, ma
                 option["ticker"] = ticker
                 option["line_number"] = line_number
                 option["has_earnings"] = has_earnings
-                option["underlying_iv"] = volatility
+                option["underlying_iv"] = option['volatility']
         return options
 
     except requests.exceptions.RequestException as e:
