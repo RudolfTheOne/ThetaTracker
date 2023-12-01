@@ -55,6 +55,7 @@ def is_market_open(api_key):
 def filter_and_sort_options(data, max_delta, buying_power, sorting_method):
     """Filter options based on the delta range and calculate the ARR for each option."""
     options = []
+    put_call_ratio = calculate_put_call_ratio(data)
     put_exp_date_map = data.get("putExpDateMap", {})
     for date in put_exp_date_map:
         for strike_price in put_exp_date_map[date]:
@@ -71,28 +72,30 @@ def filter_and_sort_options(data, max_delta, buying_power, sorting_method):
                                                       if option["daysToExpiration"] != 0 else \
                                                       option["premium_usd"], 2)
                     option["arr"] = round(option["premium_usd"] / buying_power * 365 / int(option["daysToExpiration"]) * 100, 3)
+                    option["put_call_ratio"] = put_call_ratio
                     options.append(option)
 
     options = sorted(options, key=lambda option: option.get(sorting_method, -1), reverse=True)[:5]
     return options
 
-
 def handle_api_error(ticker):
     logging.error(f"Error: Unable to make API request for {ticker}")
 
 
-def fetch_option_for_ticker(api_key, ticker, line_number, contract_type, from_date, to_date, max_delta, buying_power, sorting_method,
+def fetch_option_for_ticker(api_key, ticker, line_number, from_date, to_date, max_delta, buying_power, sorting_method,
                        finnhub_api_key):
     try:
-        endpoint = f"https://api.tdameritrade.com/v1/marketdata/chains?apikey={api_key}&symbol={ticker}&contractType={contract_type}&strikeCount={STRIKE_COUNT_LIMIT}&fromDate={from_date.strftime('%Y-%m-%d')}&toDate={to_date.strftime('%Y-%m-%d')}"
+        endpoint = f"https://api.tdameritrade.com/v1/marketdata/chains?apikey={api_key}&symbol={ticker}&strikeCount={STRIKE_COUNT_LIMIT}&includeQuotes=TRUE&fromDate={from_date.strftime('%Y-%m-%d')}&toDate={to_date.strftime('%Y-%m-%d')}"
         data = make_api_request(api_key, endpoint)
 
-        if not data or "putExpDateMap" not in data:
+        if not data or ("putExpDateMap" not in data and "callExpDateMap" not in data):
             handle_api_error(ticker)
             return []
 
         volatility = data['volatility']
         options = filter_and_sort_options(data, float(max_delta), float(buying_power), sorting_method)
+
+        options = [option for option in options if option.get("put_call_ratio") != float('inf')]
 
         # Check if we have any options for the ticker
         if options:
@@ -125,7 +128,6 @@ def fetch_option_for_ticker(api_key, ticker, line_number, contract_type, from_da
                 option["line_number"] = line_number
                 option["has_earnings"] = has_earnings
                 option["underlying_iv"] = volatility
-
         return options
 
     except requests.exceptions.RequestException as e:
@@ -134,20 +136,21 @@ def fetch_option_for_ticker(api_key, ticker, line_number, contract_type, from_da
         return []
 
 
-def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_delta, buying_power, sorting_method,
-                       finnhub_api_key):
+def fetch_option_chain(api_key, tickers, from_date, to_date, max_delta, buying_power, sorting_method, finnhub_api_key):
     all_options = []
 
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {
-            executor.submit(fetch_option_for_ticker, api_key, ticker, line_number, contract_type, from_date, to_date,
+            executor.submit(fetch_option_for_ticker, api_key, ticker, line_number, from_date, to_date,
                             max_delta, buying_power, sorting_method, finnhub_api_key): ticker for ticker, line_number in
             tickers}
 
         for future in as_completed(futures):
             exception = future.exception()
             if exception is not None:
-                tickers.remove(futures[future])  # remove the ticker from the list
+                ticker = futures[future]
+                if ticker in tickers:  # check if the ticker is in the list
+                    tickers.remove(ticker)  # if yes, remove the ticker from the list
             else:
                 all_options.extend(future.result())
 
@@ -158,3 +161,17 @@ def fetch_option_chain(api_key, tickers, contract_type, from_date, to_date, max_
         all_options.sort(key=lambda option: float(option.get(sorting_method, "Key not present")), reverse=True)
 
     return all_options
+
+def calculate_put_call_ratio(data):
+    put_options = data.get('putExpDateMap', {})
+    call_options = data.get('callExpDateMap', {})
+
+    put_vol = sum(option['totalVolume'] for date in put_options for strike in put_options[date] for option in put_options[date][strike])
+    call_vol = sum(option['totalVolume'] for date in call_options for strike in call_options[date] for option in call_options[date][strike])
+
+    if call_vol != 0:
+        ratio = put_vol / call_vol
+    else:
+        ratio = float('inf')  # Handle division by zero
+
+    return ratio

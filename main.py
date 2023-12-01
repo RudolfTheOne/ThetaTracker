@@ -13,6 +13,13 @@ def format_option(option):
         row3 = urwid.Text([('default', f"\n")])
         return urwid.Pile([row1, row2, row3])
 
+    if option['put_call_ratio'] > 1.1:
+        put_call_emoji = '⚠️'
+    elif option['put_call_ratio'] < 0.9:
+        put_call_emoji = '✅'
+    else:
+        put_call_emoji = '⚖️'
+
     row1 = urwid.Text([
         ('default', f"\nTicker: "),
         ('bright white', f"{option['ticker']} [{option['line_number']}], "),
@@ -27,13 +34,13 @@ def format_option(option):
         ('default', f"AskSize: "),
         ('dark green', f"{option['askSize']}, "),
         ('default', f"Spread: "),
-        ('bright green,bold', f"{round(((option['ask'] - option['bid']) / option['ask']), 2) * 100}%")
+        ('bright green,bold', f"{round(((option['ask'] - option['bid']) / option['ask']) * 100, 2)}%")
     ])
 
     row2 = urwid.Text([
         ('dark red', f"   RISK: "),
         ('default', f"PUT/CALL ratio: "),
-        ('bright white', f"11.0, "),
+        ('bright white', f"{round(option['put_call_ratio'],2)} {put_call_emoji}, "),
         ('default', f"Stock IV: "),
         ('bright white', f"{option['underlying_iv']}, "),
         ('default', f"Delta: "),
@@ -52,7 +59,7 @@ def format_option(option):
         ('bright white', f"${option['strikePrice']}, "),
         ('default', f"DTO: "),
         ('bright white', f"{option['daysToExpiration']}, "),
-        ('default', f"Number to open: "),
+        ('default', f"No to open: "),
         ('bright purple', f"{option['no_of_contracts_to_write']} @ ${option['bid']}"),
         ('default', " ⚠️  📆") if option["has_earnings"] else ('default', '')
     ])
@@ -251,7 +258,6 @@ class MainFrame(urwid.Frame):
         options = fetch_option_chain(
             self.system_config["api_key"],
             self.tickers,
-            "PUT",
             from_date,
             to_date,
             new_config["max_delta"],
@@ -506,7 +512,7 @@ def main():
     user_config["to_date"] = to_date
 
     print("Loading options...")
-    options = fetch_option_chain(system_config["api_key"], tickers, "PUT", from_date, to_date,
+    options = fetch_option_chain(system_config["api_key"], tickers, from_date, to_date,
                                  user_config["max_delta"], user_config["buying_power"],
                                  user_config["default_sorting_method"], system_config["finnhub_api_key"])
 
