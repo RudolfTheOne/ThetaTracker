@@ -84,6 +84,8 @@ def handle_api_error(ticker):
 
 def fetch_option_for_ticker(api_key, ticker, line_number, from_date, to_date, max_delta, buying_power, sorting_method,
                        finnhub_api_key):
+    earnings_data_retrieved = False
+
     try:
         endpoint = f"https://api.tdameritrade.com/v1/marketdata/chains?apikey={api_key}&symbol={ticker}&strikeCount={STRIKE_COUNT_LIMIT}&includeQuotes=TRUE&fromDate={from_date.strftime('%Y-%m-%d')}&toDate={to_date.strftime('%Y-%m-%d')}"
         data = make_api_request(api_key, endpoint)
@@ -117,6 +119,7 @@ def fetch_option_for_ticker(api_key, ticker, line_number, from_date, to_date, ma
             if response.status_code == 200 and response.text:
                 earnings_data = response.json()
                 has_earnings = earnings_data.get('earningsCalendar', []) != []
+                earnings_data_retrieved = True
             else:
                 logging.error(
                     f"Error: Unable to fetch earnings data for {ticker}. HTTP status code: {response.status_code}")
@@ -126,6 +129,7 @@ def fetch_option_for_ticker(api_key, ticker, line_number, from_date, to_date, ma
                 option["ticker"] = ticker
                 option["line_number"] = line_number
                 option["has_earnings"] = has_earnings
+                option["earnings_data_retrieved"] = earnings_data_retrieved
                 option["underlying_iv"] = option['volatility']
         return options
 

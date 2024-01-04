@@ -61,7 +61,8 @@ def format_option(option):
         ('bright white', f"{option['daysToExpiration']}, "),
         ('default', f"No to open: "),
         ('bright purple', f"{option['no_of_contracts_to_write']} @ ${option['bid']}"),
-        ('default', " ⚠️  📆") if option["has_earnings"] else ('default', '')
+        ('default', "⚠️ 📆") if option["has_earnings"] else ('default', "📵 📆") if not option["earnings_data_retrieved"] else (
+        'default', '')
     ])
 
     return urwid.Pile([row1, row2, row3])
