@@ -17,6 +17,8 @@ def format_option(option):
         put_call_emoji = '⚠️ '
     elif option['put_call_ratio'] < 0.9:
         put_call_emoji = '✅ '
+    elif option['put_call_ratio'] == 0:
+        put_call_emoji = '0️⃣ '
     else:
         put_call_emoji = '⚖️ '
 
